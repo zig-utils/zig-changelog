@@ -5,10 +5,10 @@ pub const CommitType = enum {
     feat,
     fix,
     docs,
-    style,
+    @"style",
     refactor,
     perf,
-    test,
+    @"test",
     build,
     ci,
     chore,
@@ -20,10 +20,10 @@ pub const CommitType = enum {
             .feat => "feat",
             .fix => "fix",
             .docs => "docs",
-            .style => "style",
+            .@"style" => "style",
             .refactor => "refactor",
             .perf => "perf",
-            .test => "test",
+            .@"test" => "test",
             .build => "build",
             .ci => "ci",
             .chore => "chore",
@@ -36,10 +36,10 @@ pub const CommitType = enum {
         if (std.mem.eql(u8, str, "feat")) return .feat;
         if (std.mem.eql(u8, str, "fix")) return .fix;
         if (std.mem.eql(u8, str, "docs")) return .docs;
-        if (std.mem.eql(u8, str, "style")) return .style;
+        if (std.mem.eql(u8, str, "style")) return .@"style";
         if (std.mem.eql(u8, str, "refactor")) return .refactor;
         if (std.mem.eql(u8, str, "perf")) return .perf;
-        if (std.mem.eql(u8, str, "test")) return .test;
+        if (std.mem.eql(u8, str, "test")) return .@"test";
         if (std.mem.eql(u8, str, "build")) return .build;
         if (std.mem.eql(u8, str, "ci")) return .ci;
         if (std.mem.eql(u8, str, "chore")) return .chore;
@@ -52,10 +52,10 @@ pub const CommitType = enum {
             .feat => "🚀 Features",
             .fix => "🐛 Bug Fixes",
             .docs => "📚 Documentation",
-            .style => "💅 Styles",
+            .@"style" => "💅 Styles",
             .refactor => "♻️ Code Refactoring",
             .perf => "⚡ Performance Improvements",
-            .test => "🧪 Tests",
+            .@"test" => "🧪 Tests",
             .build => "📦 Build System",
             .ci => "🤖 Continuous Integration",
             .chore => "🧹 Chores",

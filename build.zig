@@ -4,9 +4,9 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Library module
-    const lib_module = b.addModule("zig-changelog", .{
-        .root_source_file = b.path("src/lib.zig"),
+    // Root module for the library
+    const root_module = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -14,9 +14,7 @@ pub fn build(b: *std.Build) void {
     // CLI executable
     const exe = b.addExecutable(.{
         .name = "changelog",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = root_module,
     });
     b.installArtifact(exe);
 
@@ -31,10 +29,14 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // Tests
-    const lib_unit_tests = b.addTest(.{
+    const test_module = b.createModule(.{
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const lib_unit_tests = b.addTest(.{
+        .root_module = test_module,
     });
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
