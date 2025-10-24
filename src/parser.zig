@@ -75,7 +75,7 @@ pub fn parseCommitLine(
     line: []const u8,
     separator: []const u8,
 ) !types.Commit {
-    var parts = std.mem.split(u8, line, separator);
+    var parts = std.mem.splitSequence(u8, line, separator);
 
     const hash = parts.next() orelse return error.InvalidCommitFormat;
     const short_hash = parts.next() orelse return error.InvalidCommitFormat;

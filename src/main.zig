@@ -92,13 +92,13 @@ pub fn main() !void {
     // Output changelog
     if (config.output_file) |output_file| {
         // Read existing changelog if it exists
-        var file_content = std.ArrayList(u8).init(allocator);
-        defer file_content.deinit();
+        var file_content: std.ArrayList(u8) = .{};
+        defer file_content.deinit(allocator);
 
         const file = std.fs.cwd().openFile(output_file, .{}) catch |err| blk: {
             if (err == error.FileNotFound) {
                 // Create new file with header
-                try file_content.writer().writeAll("# Changelog\n\n");
+                try file_content.writer(allocator).writeAll("# Changelog\n\n");
                 break :blk null;
             }
             return err;
@@ -111,19 +111,19 @@ pub fn main() !void {
 
             // Find first ## or end of file to insert new changelog
             if (std.mem.indexOf(u8, existing_content, "\n## ")) |idx| {
-                try file_content.writer().writeAll(existing_content[0 .. idx + 1]);
-                try file_content.writer().writeAll(result.content);
-                try file_content.writer().writeAll("\n");
-                try file_content.writer().writeAll(existing_content[idx + 1 ..]);
+                try file_content.writer(allocator).writeAll(existing_content[0 .. idx + 1]);
+                try file_content.writer(allocator).writeAll(result.content);
+                try file_content.writer(allocator).writeAll("\n");
+                try file_content.writer(allocator).writeAll(existing_content[idx + 1 ..]);
             } else {
-                try file_content.writer().writeAll(existing_content);
+                try file_content.writer(allocator).writeAll(existing_content);
                 if (!std.mem.endsWith(u8, existing_content, "\n\n")) {
-                    try file_content.writer().writeAll("\n");
+                    try file_content.writer(allocator).writeAll("\n");
                 }
-                try file_content.writer().writeAll(result.content);
+                try file_content.writer(allocator).writeAll(result.content);
             }
         } else {
-            try file_content.writer().writeAll(result.content);
+            try file_content.writer(allocator).writeAll(result.content);
         }
 
         // Write to file
@@ -138,7 +138,8 @@ pub fn main() !void {
         }
     } else {
         // Print to stdout
-        const stdout = std.io.getStdOut().writer();
+        const stdout_file = std.posix.STDOUT_FILENO;
+        const stdout = std.fs.File{ .handle = stdout_file };
         try stdout.writeAll(result.content);
     }
 }

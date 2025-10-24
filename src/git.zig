@@ -4,21 +4,23 @@ const parser = @import("parser.zig");
 
 /// Check if directory is a git repository
 pub fn isGitRepository(allocator: std.mem.Allocator, dir: []const u8) !bool {
-    const git_dir = try std.fs.path.join(allocator, &[_][]const u8{ dir, ".git" });
-    defer allocator.free(git_dir);
+    // Try to open .git directory
+    var dir_fd = std.fs.cwd().openDir(dir, .{}) catch return false;
+    defer dir_fd.close();
 
-    std.fs.accessAbsolute(git_dir, .{}) catch return false;
+    dir_fd.access(".git", .{}) catch return false;
+    _ = allocator; // for compatibility
     return true;
 }
 
 /// Get the latest git tag
 pub fn getLatestTag(allocator: std.mem.Allocator, dir: []const u8) !?[]const u8 {
-    const result = try runGitCommand(allocator, dir, &[_][]const u8{
+    const result = runGitCommand(allocator, dir, &[_][]const u8{
         "git",
         "describe",
         "--tags",
         "--abbrev=0",
-    });
+    }) catch return null; // No tags found
     defer allocator.free(result);
 
     if (result.len == 0) return null;
@@ -74,8 +76,10 @@ pub fn getCommits(
     defer allocator.free(range);
 
     // Format: hash|short_hash|author_name|author_email|date|subject|body
+    // Use special delimiter that's unlikely to appear in commit messages
     const separator = "|||";
-    const format = "--pretty=format:%H" ++ separator ++ "%h" ++ separator ++ "%an" ++ separator ++ "%ae" ++ separator ++ "%ci" ++ separator ++ "%s" ++ separator ++ "%b";
+    const commit_separator = "\x00COMMIT_SEP\x00"; // Null-byte based separator
+    const format = "--pretty=format:%H" ++ separator ++ "%h" ++ separator ++ "%an" ++ separator ++ "%ae" ++ separator ++ "%ci" ++ separator ++ "%s" ++ separator ++ "%b" ++ commit_separator;
 
     const result = try runGitCommand(allocator, dir, &[_][]const u8{
         "git",
@@ -86,20 +90,21 @@ pub fn getCommits(
     });
     defer allocator.free(result);
 
-    var commits = std.ArrayList(types.Commit).init(allocator);
+    var commits: std.ArrayList(types.Commit) = .{};
     errdefer {
         for (commits.items) |*commit| {
             commit.deinit(allocator);
         }
-        commits.deinit();
+        commits.deinit(allocator);
     }
 
-    var lines = std.mem.split(u8, result, "\n");
-    while (lines.next()) |line| {
-        if (line.len == 0) continue;
+    var commit_blocks = std.mem.splitSequence(u8, result, commit_separator);
+    while (commit_blocks.next()) |block| {
+        const trimmed = std.mem.trim(u8, block, &std.ascii.whitespace);
+        if (trimmed.len == 0) continue;
 
-        const commit = try parser.parseCommitLine(allocator, line, separator);
-        try commits.append(commit);
+        const commit = try parser.parseCommitLine(allocator, trimmed, separator);
+        try commits.append(allocator, commit);
     }
 
     return commits;

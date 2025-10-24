@@ -12,7 +12,7 @@ pub fn groupCommits(
     defer {
         var it = sections_map.valueIterator();
         while (it.next()) |section| {
-            section.deinit();
+            section.deinit(allocator);
         }
         sections_map.deinit();
     }
@@ -51,16 +51,16 @@ pub fn groupCommits(
             .body = if (commit.body) |b| try allocator.dupe(u8, b) else null,
         };
 
-        try entry.value_ptr.commits.append(commit_copy);
+        try entry.value_ptr.commits.append(allocator, commit_copy);
     }
 
     // Convert map to sorted array
-    var sections = std.ArrayList(types.Section).init(allocator);
+    var sections: std.ArrayList(types.Section) = .{};
     errdefer {
         for (sections.items) |*section| {
-            section.deinit();
+            section.deinit(allocator);
         }
-        sections.deinit();
+        sections.deinit(allocator);
     }
 
     // Define section order
@@ -98,9 +98,9 @@ pub fn groupCommits(
                         .breaking = commit.breaking,
                         .body = if (commit.body) |b| try allocator.dupe(u8, b) else null,
                     };
-                    try new_section.commits.append(commit_copy);
+                    try new_section.commits.append(allocator, commit_copy);
                 }
-                try sections.append(new_section);
+                try sections.append(allocator, new_section);
             }
         }
     }
@@ -116,16 +116,16 @@ pub fn generateMarkdown(
     from_ref: ?[]const u8,
     to_ref: []const u8,
 ) ![]const u8 {
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var buffer: std.ArrayList(u8) = .{};
+    defer buffer.deinit(allocator);
 
-    const writer = buffer.writer();
+    const writer = buffer.writer(allocator);
 
     // Write date header if enabled
     if (config.include_dates) {
         const timestamp = std.time.timestamp();
         const epoch_seconds: i64 = @intCast(timestamp);
-        const epoch_day = @divFloor(epoch_seconds, std.time.s_per_day);
+        const epoch_day: u47 = @intCast(@divFloor(epoch_seconds, std.time.s_per_day));
         const year_day = @import("std").time.epoch.EpochDay{ .day = epoch_day };
         const year_and_day = year_day.calculateYearDay();
         const month_day = year_and_day.calculateMonthDay();
@@ -183,7 +183,7 @@ pub fn generateMarkdown(
         try writer.writeAll("\n");
     }
 
-    return buffer.toOwnedSlice();
+    return try buffer.toOwnedSlice(allocator);
 }
 
 /// Get unique contributors from commits
@@ -219,15 +219,15 @@ pub fn getContributors(
         }
     }
 
-    var contributors = std.ArrayList([]const u8).init(allocator);
+    var contributors: std.ArrayList([]const u8) = .{};
     errdefer {
         for (contributors.items) |c| allocator.free(c);
-        contributors.deinit();
+        contributors.deinit(allocator);
     }
 
     var it = contributors_set.keyIterator();
     while (it.next()) |key| {
-        try contributors.append(try allocator.dupe(u8, key.*));
+        try contributors.append(allocator, try allocator.dupe(u8, key.*));
     }
 
     return contributors;
@@ -270,7 +270,7 @@ pub fn generateChangelog(
         for (commits.items) |*commit| {
             commit.deinit(allocator);
         }
-        commits.deinit();
+        commits.deinit(allocator);
     }
 
     if (config.verbose) {
@@ -281,9 +281,9 @@ pub fn generateChangelog(
     var sections = try groupCommits(allocator, commits.items, config);
     errdefer {
         for (sections.items) |*section| {
-            section.deinit();
+            section.deinit(allocator);
         }
-        sections.deinit();
+        sections.deinit(allocator);
     }
 
     if (config.verbose) {

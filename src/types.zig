@@ -99,18 +99,19 @@ pub const Section = struct {
     commits: std.ArrayList(Commit),
 
     pub fn init(allocator: std.mem.Allocator, commit_type: CommitType) Section {
+        _ = allocator;
         return Section{
             .commit_type = commit_type,
             .title = commit_type.getTitle(),
-            .commits = std.ArrayList(Commit).init(allocator),
+            .commits = .{},
         };
     }
 
-    pub fn deinit(self: *Section) void {
+    pub fn deinit(self: *Section, allocator: std.mem.Allocator) void {
         for (self.commits.items) |*commit| {
-            commit.deinit(self.commits.allocator);
+            commit.deinit(allocator);
         }
-        self.commits.deinit();
+        self.commits.deinit(allocator);
     }
 };
 
@@ -135,8 +136,8 @@ pub const ChangelogResult = struct {
     pub fn deinit(self: *ChangelogResult, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
         for (self.sections.items) |*section| {
-            section.deinit();
+            section.deinit(allocator);
         }
-        self.sections.deinit();
+        self.sections.deinit(allocator);
     }
 };
