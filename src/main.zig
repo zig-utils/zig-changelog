@@ -13,7 +13,10 @@ pub fn main(init: std.process.Init) !void {
     var show_version = false;
     var dir: []const u8 = ".";
 
-    var args = init.minimal.args.iterate();
+    // iterateAllocator is the portable version — iterate() @compileErrors
+    // on Windows and tells you to use initAllocator.
+    var args = try init.minimal.args.iterateAllocator(allocator);
+    defer args.deinit();
     _ = args.skip(); // program name
 
     while (args.next()) |arg| {
