@@ -103,7 +103,7 @@ pub const Section = struct {
         return Section{
             .commit_type = commit_type,
             .title = commit_type.getTitle(),
-            .commits = .{},
+            .commits = .empty,
         };
     }
 

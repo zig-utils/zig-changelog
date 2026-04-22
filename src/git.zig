@@ -1,21 +1,21 @@
 const std = @import("std");
+const Io = std.Io;
 const types = @import("types.zig");
 const parser = @import("parser.zig");
 
 /// Check if directory is a git repository
-pub fn isGitRepository(allocator: std.mem.Allocator, dir: []const u8) !bool {
-    // Try to open .git directory
-    var dir_fd = std.fs.cwd().openDir(dir, .{}) catch return false;
-    defer dir_fd.close();
-
-    dir_fd.access(".git", .{}) catch return false;
+pub fn isGitRepository(allocator: std.mem.Allocator, io: Io, dir: []const u8) !bool {
     _ = allocator; // for compatibility
+    var dir_fd = Io.Dir.cwd().openDir(io, dir, .{}) catch return false;
+    defer dir_fd.close(io);
+
+    dir_fd.access(io, ".git", .{}) catch return false;
     return true;
 }
 
 /// Get the latest git tag
-pub fn getLatestTag(allocator: std.mem.Allocator, dir: []const u8) !?[]const u8 {
-    const result = runGitCommand(allocator, dir, &[_][]const u8{
+pub fn getLatestTag(allocator: std.mem.Allocator, io: Io, dir: []const u8) !?[]const u8 {
+    const result = runGitCommand(allocator, io, dir, &[_][]const u8{
         "git",
         "describe",
         "--tags",
@@ -33,8 +33,8 @@ pub fn getLatestTag(allocator: std.mem.Allocator, dir: []const u8) !?[]const u8 
 }
 
 /// Get repository URL from git config
-pub fn getRepositoryUrl(allocator: std.mem.Allocator, dir: []const u8) !?[]const u8 {
-    const result = try runGitCommand(allocator, dir, &[_][]const u8{
+pub fn getRepositoryUrl(allocator: std.mem.Allocator, io: Io, dir: []const u8) !?[]const u8 {
+    const result = try runGitCommand(allocator, io, dir, &[_][]const u8{
         "git",
         "config",
         "--get",
@@ -65,6 +65,7 @@ pub fn getRepositoryUrl(allocator: std.mem.Allocator, dir: []const u8) !?[]const
 /// Get git commits in a range
 pub fn getCommits(
     allocator: std.mem.Allocator,
+    io: Io,
     dir: []const u8,
     from_ref: ?[]const u8,
     to_ref: []const u8,
@@ -81,7 +82,7 @@ pub fn getCommits(
     const commit_separator = "\x00COMMIT_SEP\x00"; // Null-byte based separator
     const format = "--pretty=format:%H" ++ separator ++ "%h" ++ separator ++ "%an" ++ separator ++ "%ae" ++ separator ++ "%ci" ++ separator ++ "%s" ++ separator ++ "%b" ++ commit_separator;
 
-    const result = try runGitCommand(allocator, dir, &[_][]const u8{
+    const result = try runGitCommand(allocator, io, dir, &[_][]const u8{
         "git",
         "log",
         range,
@@ -90,7 +91,7 @@ pub fn getCommits(
     });
     defer allocator.free(result);
 
-    var commits: std.ArrayList(types.Commit) = .{};
+    var commits: std.ArrayList(types.Commit) = .empty;
     errdefer {
         for (commits.items) |*commit| {
             commit.deinit(allocator);
@@ -113,33 +114,25 @@ pub fn getCommits(
 /// Run a git command and return its output
 fn runGitCommand(
     allocator: std.mem.Allocator,
+    io: Io,
     dir: []const u8,
     argv: []const []const u8,
 ) ![]const u8 {
-    var child = std.process.Child.init(argv, allocator);
-    child.cwd = dir;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    const result = try std.process.run(allocator, io, .{
+        .argv = argv,
+        .cwd = .{ .path = dir },
+    });
+    defer allocator.free(result.stderr);
 
-    try child.spawn();
-
-    const stdout = try child.stdout.?.readToEndAlloc(allocator, 10 * 1024 * 1024);
-    errdefer allocator.free(stdout);
-
-    const stderr = try child.stderr.?.readToEndAlloc(allocator, 10 * 1024 * 1024);
-    defer allocator.free(stderr);
-
-    const term = try child.wait();
-
-    if (term != .Exited or term.Exited != 0) {
-        if (stderr.len > 0) {
-            std.debug.print("Git command failed: {s}\n", .{stderr});
+    if (result.term != .exited or result.term.exited != 0) {
+        if (result.stderr.len > 0) {
+            std.debug.print("Git command failed: {s}\n", .{result.stderr});
         }
-        allocator.free(stdout);
+        allocator.free(result.stdout);
         return error.GitCommandFailed;
     }
 
-    return stdout;
+    return result.stdout;
 }
 
 /// Generate compare URL for a commit range

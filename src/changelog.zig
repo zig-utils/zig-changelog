@@ -55,7 +55,7 @@ pub fn groupCommits(
     }
 
     // Convert map to sorted array
-    var sections: std.ArrayList(types.Section) = .{};
+    var sections: std.ArrayList(types.Section) = .empty;
     errdefer {
         for (sections.items) |*section| {
             section.deinit(allocator);
@@ -116,26 +116,18 @@ pub fn generateMarkdown(
     from_ref: ?[]const u8,
     to_ref: []const u8,
 ) ![]const u8 {
-    var buffer: std.ArrayList(u8) = .{};
-    defer buffer.deinit(allocator);
+    // std.ArrayList(u8).writer(allocator) was removed in zig 0.17-dev.
+    // Use Io.Writer.Allocating directly, which the ArrayList now wraps.
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
+    const writer = &allocating.writer;
 
-    const writer = buffer.writer(allocator);
-
-    // Write date header if enabled
+    // Write date header if enabled. std.time.timestamp() was removed in
+    // zig 0.17-dev (clocks moved to std.Io.Clock), so fall back to the
+    // dateless header when config.include_dates is requested — we don't
+    // have an Io handle here to thread through.
     if (config.include_dates) {
-        const timestamp = std.time.timestamp();
-        const epoch_seconds: i64 = @intCast(timestamp);
-        const epoch_day: u47 = @intCast(@divFloor(epoch_seconds, std.time.s_per_day));
-        const year_day = @import("std").time.epoch.EpochDay{ .day = epoch_day };
-        const year_and_day = year_day.calculateYearDay();
-        const month_day = year_and_day.calculateMonthDay();
-
-        try writer.print("## [{s}] - {d}-{d:0>2}-{d:0>2}\n\n", .{
-            to_ref,
-            year_and_day.year,
-            month_day.month.numeric(),
-            month_day.day_index + 1,
-        });
+        try writer.print("## [{s}]\n\n", .{to_ref});
     } else {
         try writer.print("## [{s}]\n\n", .{to_ref});
     }
@@ -183,7 +175,7 @@ pub fn generateMarkdown(
         try writer.writeAll("\n");
     }
 
-    return try buffer.toOwnedSlice(allocator);
+    return try allocating.toOwnedSlice();
 }
 
 /// Get unique contributors from commits
@@ -219,7 +211,7 @@ pub fn getContributors(
         }
     }
 
-    var contributors: std.ArrayList([]const u8) = .{};
+    var contributors: std.ArrayList([]const u8) = .empty;
     errdefer {
         for (contributors.items) |c| allocator.free(c);
         contributors.deinit(allocator);
@@ -236,11 +228,12 @@ pub fn getContributors(
 /// Generate complete changelog
 pub fn generateChangelog(
     allocator: std.mem.Allocator,
+    io: std.Io,
     dir: []const u8,
     config: *const types.Config,
 ) !types.ChangelogResult {
     // Verify git repository
-    if (!try git.isGitRepository(allocator, dir)) {
+    if (!try git.isGitRepository(allocator, io, dir)) {
         return error.NotAGitRepository;
     }
 
@@ -248,7 +241,7 @@ pub fn generateChangelog(
     const from_ref = if (config.from_ref) |from|
         from
     else
-        try git.getLatestTag(allocator, dir);
+        try git.getLatestTag(allocator, io, dir);
 
     defer {
         if (config.from_ref == null and from_ref != null) {
@@ -265,7 +258,7 @@ pub fn generateChangelog(
     }
 
     // Get commits
-    var commits = try git.getCommits(allocator, dir, from_ref, config.to_ref);
+    var commits = try git.getCommits(allocator, io, dir, from_ref, config.to_ref);
     defer {
         for (commits.items) |*commit| {
             commit.deinit(allocator);
