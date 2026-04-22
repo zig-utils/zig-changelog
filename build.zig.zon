@@ -2,7 +2,7 @@
     .name = .zig_changelog,
     .version = "0.1.1",
     .minimum_zig_version = "0.15.0",
-    .fingerprint = 0xa1b2c3d4e5f60002,
+    .fingerprint = 0x259f6668b31f160d,
     .dependencies = .{},
     .paths = .{
         "README.md",
