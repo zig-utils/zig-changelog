@@ -128,7 +128,7 @@ changelog --verbose -o CHANGELOG.md
 In your release script:
 
 ```bash
-#!/bin/bash
+# !/bin/bash
 
 # Generate changelog
 changelog --from $(git describe --tags --abbrev=0) -o CHANGELOG.md
@@ -192,6 +192,7 @@ The generated changelog follows this format:
 ### 📚 Documentation
 
 - update API documentation ([jkl012c](https://github.com/user/repo/commit/jkl012c))
+
 ```
 
 ## API Reference
