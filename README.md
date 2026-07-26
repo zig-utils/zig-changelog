@@ -352,6 +352,16 @@ This tool is inspired by [logsmith](https://github.com/stacksjs/logsmith) but im
 - **Memory Safety**: Zig's compile-time memory safety guarantees
 - **Simplicity**: Focused on core changelog generation features
 
+## Community
+
+For help, discussion about best practices, or any other conversation that would benefit from being searchable:
+
+[Discussions on GitHub](https://github.com/zig-utils/zig-changelog/discussions)
+
+For casual chit-chat with others using this package:
+
+[Join the Stacks Discord Server](https://stacksjs.com/discord)
+
 ## License
 
 MIT License - see LICENSE file for details
